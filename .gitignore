@@ -33,3 +33,5 @@ build/
 .vscode/
 /testing-storage-setup/data/
 /temp-filing/
+
+/testing-storage-setup/config.json

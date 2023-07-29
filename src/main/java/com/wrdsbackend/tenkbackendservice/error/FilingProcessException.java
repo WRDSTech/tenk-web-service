@@ -1,12 +1,15 @@
 package com.wrdsbackend.tenkbackendservice.error;
 
-
-import io.netty.handler.codec.http.HttpResponseStatus;
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.web.ErrorResponseException;
 
-public class FilingProcessException extends RuntimeException {
-    public FilingProcessException(String url, HttpStatus status, String reason) {
-        super(String.format("Failed to process filing : '%s'. Got: '%s'. Reason: '%s'",
-                url, status, reason));
+@Getter
+public class FilingProcessException extends ErrorResponseException {
+    public FilingProcessException(String filingName) {
+        super(HttpStatus.INTERNAL_SERVER_ERROR);
+        this.setTitle("Filing processing failed");
+        this.setDetail(String.format("Failed to process filing : '%s'.", filingName));
     }
 }

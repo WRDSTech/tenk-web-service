@@ -73,10 +73,12 @@ public class TenkController {
                                     "}"
                     )
             )}),
-            @ApiResponse(responseCode = "404", content = {@Content(schema = @Schema())},
-                    description = "Given URL does not map to any existing filing resources."),
             @ApiResponse(responseCode = "400", content = {@Content(schema = @Schema())},
                     description = "Bad request. This may suggest the URL format is not valid."),
+            @ApiResponse(responseCode = "404", content = {@Content(schema = @Schema())},
+                    description = "Given URL does not map to any existing filing resources."),
+            @ApiResponse(responseCode = "422", content = {@Content(schema = @Schema())},
+                    description = "Unprocessable Content. The input URL may not be a complete URL."),
             @ApiResponse(responseCode = "500", content = {@Content(schema = @Schema())},
                     description = "Internal Server Error.")
     })

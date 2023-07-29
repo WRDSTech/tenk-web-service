@@ -49,15 +49,15 @@ public class TenkBackendServiceApplication {
                     .findFirst();
             if (bucket.isEmpty()) {
                 try {
-                    log.info("creating bucket {}.", bucketName);
+                    log.info("creating bucket '{}'.", bucketName);
                     s3Client.createBucket(CreateBucketRequest
                             .builder()
                             .bucket(bucketName)
                             .build());
 
-                    log.info("Bucket {} created successfully.", bucketName);
+                    log.info("Bucket '{}' created successfully.", bucketName);
                 } catch (S3Exception e) {
-                    log.error("Unable to create bucket: {}.", bucketName);
+                    log.error("Unable to create bucket: '{}'.", bucketName);
                     log.error("Error detail: {}.", e.awsErrorDetails().sdkHttpResponse().statusText());
                     System.exit(1);
                 }

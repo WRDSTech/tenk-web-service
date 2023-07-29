@@ -1,8 +1,8 @@
 tenk:
   filing-itemization-service-specification:
-    host: "localhost"
-    port: "8000"
-    path: "api/internal/tenk/process-html-filing-url"
+    host: ${ITEMIZATION_SERVICE_ADDRESS:localhost}
+    port: ${ITEMIZATION_SERVICE_PORT:8000}
+    path: ${ITEMIZATION_SERVICE_FILING_PROCESS_PATH:api/internal/tenk/process-html-filing-url}
   ticker-map:
     2021AAPL: "https://www.sec.gov/Archives/edgar/data/320193/000032019322000108/0000320193-22-000108.txt"
     2021VZ: "https://www.sec.gov/Archives/edgar/data/732712/000073271222000008/0000732712-22-000008.txt"
@@ -41,18 +41,22 @@ tenk:
     json: "_json"
 hbase:
   zookeeper:
-    quorum: "hbase-docker"
+    quorum: ${HBASE_ZK_ADDRESS:hbase-docker}
     property:
-      clientPort: "2181"
+      clientPort: ${HBASE_ZK_PORT:2181}
 ozone:
   om:
-    host: "localhost"
-    port: "9878"
-    volume-name: "s3v"
-    bucket-name: "tenk-filing"
+    host: ${OZONE_ADDRESS:localhost}
+    port: ${OZONE_PORT:9878}
+    volume-name: ${OZONE_VOLUME_NAME:s3v}
+    bucket-name: ${OZONE_BUCKET_NAME:tenk-filing}
 springdoc:
   api-docs:
     path: "/v3/api-docs"
   swagger-ui:
     path: "/swagger-ui.html"
     enabled: true
+spring:
+  webflux:
+    problemdetails:
+      enabled: true
