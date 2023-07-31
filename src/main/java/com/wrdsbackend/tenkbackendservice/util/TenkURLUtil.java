@@ -21,16 +21,4 @@ public class TenkURLUtil {
         }
         return filingNameWithExtension.substring(0, endIdx);
     }
-
-    public static String getDecompressedBody(ResponseEntity<byte[]> formTxt) throws IOException {
-        byte[] rawFilingContent = formTxt.getBody();
-        GZIPInputStream gzipInputStream = new GZIPInputStream(new ByteArrayInputStream(rawFilingContent));
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        byte[] buffer = new byte[1024];
-        int bytesRead;
-        while ((bytesRead = gzipInputStream.read(buffer)) > 0) {
-            outputStream.write(buffer, 0, bytesRead);
-        }
-        return outputStream.toString(StandardCharsets.UTF_8);
-    }
 }
