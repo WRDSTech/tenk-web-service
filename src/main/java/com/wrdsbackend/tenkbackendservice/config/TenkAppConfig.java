@@ -74,20 +74,4 @@ public class TenkAppConfig {
     public TenkItemizationService tenkItemizationService(HttpServiceProxyFactory factory) {
         return factory.createClient(TenkItemizationService.class);
     }
-
-    @Bean
-    public RestTemplate tenkRestTemplate() {
-        return new RestTemplate();
-    }
-    
-    @Bean
-    public HttpEntity<String> tenkHttpEntity() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9");
-        headers.set("Accept-Encoding", "gzip, deflate, br");
-        headers.set("Accept-Language", "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,zh-TW;q=0.6");
-        headers.set("Dnt", "1");
-        headers.set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36");
-        return new HttpEntity<>(null, headers);
-    }
 }

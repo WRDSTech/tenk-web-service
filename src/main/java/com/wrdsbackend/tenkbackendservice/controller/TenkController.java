@@ -14,9 +14,13 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -38,12 +42,30 @@ public class TenkController {
         return tenkAppConfig.getTickerMap();
     }
 
-    @GetMapping("/sample-form")
+    @GetMapping(value = "/sample-form", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
     @Operation(description = "Get an itemized filing resource with filing name.", parameters = {
             @Parameter(name = "filing_name", in = ParameterIn.QUERY, required = true, description = "filing name with content type suffix.")
     })
-    public Flux<DataBuffer> getItemizedFiling(@Valid @RequestParam("filing_name") ItemizedFormReqDto req) {
-        return tenkService.getItemizedFiling(req.getFilingName());
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", content = {@Content(
+                    schema = @Schema(),
+                    mediaType = "application/octet-stream"
+            )}),
+            @ApiResponse(responseCode = "400", content = {@Content(schema = @Schema())},
+                    description = "Bad request. This may suggest the URL format is not valid."),
+            @ApiResponse(responseCode = "404", content = {@Content(schema = @Schema())},
+                    description = "Given URL does not map to any existing filing resources."),
+            @ApiResponse(responseCode = "500", content = {@Content(schema = @Schema())},
+                    description = "Internal Server Error.")
+    })
+    public Mono<InputStreamResource> getItemizedFiling(
+            @RequestParam("filing_name")
+            @Valid
+            @NotNull
+            @Pattern(regexp = "^[0-9-]+_(json|html|text)$",
+                    message = "must be a filing name followed by a type suffix. The supported types are json, html, txt.")
+            String req) {
+        return tenkService.getItemizedFiling(req);
     }
 
     @PostMapping("/itemization")

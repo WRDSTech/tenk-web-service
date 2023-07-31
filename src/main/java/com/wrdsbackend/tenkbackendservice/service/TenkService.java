@@ -19,22 +19,18 @@ import com.wrdsbackend.tenkbackendservice.util.TenkURLUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.apache.commons.io.FileUtils;
-import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.model.PutObjectResponse;
+import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.time.Duration;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -43,8 +39,6 @@ import java.util.zip.ZipOutputStream;
 @RequiredArgsConstructor
 @Slf4j
 public class TenkService {
-
-    private final int TEMP_BUF_INIT_SIZE_IN_BYTE = 4096;
 
     private final TenkAppConfig tenkAppConfig;
     private final TenkDao tenkDao;
@@ -57,18 +51,42 @@ public class TenkService {
         String filingName = TenkURLUtil.extractFilingNameFromFilingTxtURL(url);
         log.info("Extracted filing name: '{}' from url '{}'.", filingName, url);
 
-        // TODO: Test if any of the json/text/html file is not in our storage. If something is missing, process the given url.
-
-
-
         StoredItemNameSuffix typeSuffix = tenkAppConfig.getStoredItemNameSuffix();
 
-        String htmlFilingObjKey = filingName + typeSuffix.getHtml() + ".zip";
-        String textFilingObjKey = filingName + typeSuffix.getText() + ".zip";
-        String jsonFilingObjKey = filingName + typeSuffix.getJson() + ".json";
+        try {
+            // Try if all three
+            for (String fileSuffix : new String[]{typeSuffix.getJson(), typeSuffix.getHtml(), typeSuffix.getText()}) {
+                s3Client.headObject(
+                        HeadObjectRequest.builder()
+                                .bucket(ozoneConfig.getBucketName())
+                                .key(filingName + fileSuffix + ".zip")
+                                .build());
+            }
+            log.info("All resources are already present in Ozone, no need to download and process the filing.");
+            return Mono.just(new ShortResourceUrlsDto(
+                    filingName + typeSuffix.getJson(),
+                    filingName + typeSuffix.getHtml(),
+                    filingName + typeSuffix.getText()));
+        } catch (NoSuchKeyException e) {
+            log.info("One of the json/html/text file is not stored in Ozone yet, Got response status '{}' along with the message: '{}'",
+                    e.statusCode(), e.getMessage());
+            log.info("Preparing to download and process the filing content.");
+        } catch (S3Exception e) {
+            log.error("Got unexpected status when talking to Ozone. Got response status '{}' along with the message: '{}'",
+                    e.statusCode(), e.getMessage());
+            throw new UnexpectedInternalError();
+        }
 
-        ByteArrayOutputStream htmlBos = new ByteArrayOutputStream(TEMP_BUF_INIT_SIZE_IN_BYTE);
-        ByteArrayOutputStream textBos = new ByteArrayOutputStream(TEMP_BUF_INIT_SIZE_IN_BYTE);
+        String zipFileSuffix = ".zip";
+
+        String htmlFilingObjKey = filingName + typeSuffix.getHtml() + zipFileSuffix;
+        String textFilingObjKey = filingName + typeSuffix.getText() + zipFileSuffix;
+        String jsonFilingObjKey = filingName + typeSuffix.getJson() + zipFileSuffix;
+
+        int dataBufInitSize = 4096;
+        ByteArrayOutputStream jsonBos = new ByteArrayOutputStream(dataBufInitSize);
+        ByteArrayOutputStream htmlBos = new ByteArrayOutputStream(dataBufInitSize);
+        ByteArrayOutputStream textBos = new ByteArrayOutputStream(dataBufInitSize);
 
         ItemizationResultAggregator itemizationResultAggregator = new ItemizationResultAggregator(
                 new ZipOutputStream(htmlBos),
@@ -101,8 +119,13 @@ public class TenkService {
                         List<FilingItem> filingItems = aggregator.tenkFilingDbItems().stream()
                                 .map(dbItem -> new FilingItem(dbItem.getItemNumber(), dbItem.getHtmlContent()))
                                 .toList();
-                        // write all filing items in a JSON file.
-                        persistDataToOzone(new ObjectMapper().writeValueAsBytes(filingItems), jsonFilingObjKey);
+                        // write all filing items in a zipped JSON file.
+                        ZipOutputStream jsonZipOutputStream = new ZipOutputStream(jsonBos);
+                        jsonZipOutputStream.putNextEntry(new ZipEntry(filingName + ".json"));
+                        jsonZipOutputStream.write(new ObjectMapper().writeValueAsBytes(filingItems));
+                        jsonZipOutputStream.closeEntry();
+                        jsonZipOutputStream.close();
+                        persistDataToOzone(jsonBos.toByteArray(), jsonFilingObjKey);
 
                         sink.next(aggregator);
                     } catch (IOException e) {
@@ -152,12 +175,10 @@ public class TenkService {
                     }
                     return Mono.error(new UnexpectedInternalError());
                 });
-
-
     }
 
     private void persistDataToOzone(byte[] data, String objectKeyName) {
-        log.info("Uploading object '{}' to S3.", objectKeyName);
+        log.info("Uploading object '{}' to Ozone.", objectKeyName);
 
         PutObjectResponse putObjectResult = s3Client.putObject(
                 PutObjectRequest.builder()
@@ -198,12 +219,23 @@ public class TenkService {
         }
     }
 
-    public Flux<DataBuffer> getItemizedFiling(String filingName) {
+    public Mono<InputStreamResource> getItemizedFiling(String filingName) {
+        String objKey = filingName + ".zip";
 
-        // TODO: download the corresponding file from ozone and stream the result to client.
-        // Something to refer: https://www.baeldung.com/java-aws-s3-reactive#1-download-controller.
-        // s3Client.getObject(...)
-
-        return null;
+        try {
+            return Mono.just(new InputStreamResource(s3Client.getObject(
+                    GetObjectRequest.builder()
+                            .bucket(ozoneConfig.getBucketName())
+                            .key(objKey)
+                            .build())));
+        } catch (NoSuchKeyException e) {
+            log.info("Filing resource '{}' does not exists, Got response status '{}' along with the message: '{}'",
+                    objKey, e.statusCode(), e.getMessage());
+            throw new UnableToGetFilingResourceException(filingName, HttpStatusCode.valueOf(e.statusCode()));
+        } catch (S3Exception e) {
+            log.error("Got unexpected status when talking to Ozone. Got response status '{}' along with the message: '{}'",
+                    e.statusCode(), e.getMessage());
+            throw new UnexpectedInternalError();
+        }
     }
 }

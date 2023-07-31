@@ -21,6 +21,8 @@ services:
       ports:
          - 9864
       command: ["ozone","datanode"]
+      environment:
+         WAITFOR: om:9874
       env_file:
          - ./docker-config
    om:
@@ -53,6 +55,8 @@ services:
       image: jwhuang42/apache-ozone:1.3.0
       ports:
          - 9878:9878
+      environment:
+         WAITFOR: om:9874
       env_file:
          - ./docker-config
       command: ["ozone","s3g"]
